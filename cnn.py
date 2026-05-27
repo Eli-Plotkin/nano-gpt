@@ -21,35 +21,55 @@ class Value:
         return f"{self.data}"
     
     def __add__(self, other):
+        other = other if isinstance(other, Value) else Value(other, (), 'const')
         new = Value(self.data + other.data, (self, other), '+') \
-        if isinstance(other, Value) else Value(self.data + other, (self, ), '+')
         
 
         def _backward():
             self.grad += new.grad
-            if isinstance(other, Value): other.grad += new.grad
+            other.grad += new.grad
             print(f"Updating {self.label} grad to {self.grad}")
-            if isinstance(other, Value): print(f"Updating {other.label} grad to {other.grad}")
+            print(f"Updating {other.label} grad to {other.grad}")
 
 
         new._backward = _backward
 
         return new
     
+    def __sub__(self, other):
+        return self + (-1 * other)
+    
+    
     def __mul__(self, other):
-        new = Value(self.data * other.data, (self, other), '*') \
-        if isinstance(other, Value) else Value(self.data * other, (self, ), '*')
+        other = other if isinstance(other, Value) else Value(other, (), 'const')
+        new = Value(self.data * other.data, (self, other), '*') 
         
         def _backward():
             self.grad += other.data * new.grad
-            if isinstance(other, Value): other.grad += self.data * new.grad 
+            other.grad += self.data * new.grad 
             print(f"Updating {self.label} grad to {self.grad}")
-            if isinstance(other, Value): print(f"Updating {other.label} grad to {other.grad}")
+            print(f"Updating {other.label} grad to {other.grad}")
 
         
         new._backward = _backward
 
         return new
+    
+
+    def __rmul__(self, other):
+        return self * other
+    
+
+    def __pow__(self, other):
+        assert isinstance(other, (int, float)) 
+        out = Value(pow(self.data, other), (self, ), "pow")
+
+        def _backward():
+            self.grad += other * pow(self.data, other - 1) * out.grad
+
+        out._backward = _backward
+
+        return out
 
     def tanh(self):
         x = self.data
@@ -94,7 +114,7 @@ class Value:
 
 class Neuron:
     def __init__(self, num_inputs):
-        self.weights = [Value(random.uniform(-1, 1), (), f"w{i}") for i in len(num_inputs)]
+        self.weights = [Value(random.uniform(-1, 1), (), f"w{i}") for i in range(num_inputs)]
         self.bias = Value(random.uniform(-1, 1), (), "b")
 
     def __call__(self, inputs):
@@ -111,19 +131,19 @@ class Neuron:
 
 class Layer:
     def __init__(self, num_inputs, num_outputs):
-        self.neurons = [Neuron(num_inputs) for _ in len(num_outputs)]
+        self.neurons = [Neuron(num_inputs) for _ in range(num_outputs)]
 
     def __call__(self, inputs):
         out = []
         for neuron in self.neurons:
             out.append(neuron(inputs))
             
-        return out
+        return out[0] if len(out) == 1 else out
     
 class CNN:
     def __init__(self, num_inputs, num_out_per_layer):
-        in_size = [num_inputs].extend(num_out_per_layer)
-        self.layers = [Layer(in_size[i], num_out_per_layer[i]) for i in len(num_out_per_layer)]
+        in_size = [num_inputs] + num_out_per_layer
+        self.layers = [Layer(in_size[i], num_out_per_layer[i]) for i in range(len(num_out_per_layer))]
 
     def __call__(self, x):
         for layer in self.layers:
@@ -135,13 +155,13 @@ class CNN:
 curr_cnn = CNN(6, [8, 8, 1])
 
 training = [[0.4, 0.8, 0.223, -0.9, 3.67, 9.33],
-            [0.23, 0.865, 2.346, 8.321, 985.1, 1.2],
+            [0.23, 0.865, 2.346, 8.321, 5.1, 1.2],
             [34.5, 29.9, -34.5, -3.0, 0.113, 0.1]]
 
 targets = [0.3, -3.1, 0.94]
 
 predictions = [curr_cnn(x) for x in training]
 
-loss = sum([(targ - pred)**2 for targ, pred in zip(targets, predictions)])
+loss = sum([(pred - targ)**2 for pred, targ in zip(predictions, targets)])
 print(f"Loss: {loss}")
-loss.backward
+loss.backward()
