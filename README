@@ -1,0 +1,9 @@
+Eli's Notes and Learnings
+
+
+
+## Training across context lengths 
+The reason we train across context lengths (whats prediction with 1 token input, whats prediction with 2 token input, etc)
+is to prepare the model to recieve inputs in this fashion. In practice, a user may provide a 10 word or 100 word prompt, and the model is expected
+to perform at the same quality bar irrespective of input sizes.
+
